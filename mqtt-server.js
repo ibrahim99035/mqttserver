@@ -11,7 +11,7 @@ const server = http.createServer(app);
 // Configure Socket.IO with CORS
 const io = socketIo(server, {
   cors: {
-    origin: "http://localhost:5500", // Your HTML server address
+    origin: "https://ibrahim99035.github.io/", // Your HTML server address
     methods: ["GET", "POST"],
     credentials: true
   }
