@@ -1,0 +1,17 @@
+{
+    "name": "esp8266-mqtt-server",
+    "version": "1.0.0",
+    "description": "Node.js server for ESP8266 MQTT communication",
+    "main": "mqtt-server.js",
+    "scripts": {
+      "start-mqtt": "node mqtt-server.js",
+      "start-html": "node html-server.js",
+      "start": "concurrently \"npm run start-mqtt\" \"npm run start-html\""
+    },
+    "dependencies": {
+      "express": "^4.17.1",
+      "mqtt": "^4.3.7",
+      "socket.io": "^4.5.1",
+      "concurrently": "^7.0.0"
+    }
+  }

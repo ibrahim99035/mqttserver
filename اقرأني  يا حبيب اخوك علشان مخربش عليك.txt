@@ -1,0 +1,10 @@
+get the git bash here
+
+run those:
+
+npm install
+
+npm start
+
+
+لو لقيت ايرور ابقى ابعته علشان مش عارف اجربه من الضهر

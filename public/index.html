@@ -1,0 +1,223 @@
+<!-- public/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+  <title>ESP8266 MQTT Communication</title>
+  <style>
+    /* Ultra-enhanced styles */
+    body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 40px 20px;
+        background: linear-gradient(to right, #f0f2f5, #fafafa);
+        color: #2c3e50;
+        line-height: 1.6;
+    }
+    
+    .container {
+        display: flex;
+        flex-direction: column;
+        gap: 30px;
+    }
+    
+    .card {
+        border-radius: 14px;
+        background: #ffffff;
+        padding: 30px 25px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+        transition: box-shadow 0.3s ease, transform 0.2s ease;
+    }
+    
+    .card:hover {
+        box-shadow: 0 12px 32px rgba(0,0,0,0.12);
+        transform: translateY(-2px);
+    }
+    
+    h1, h2 {
+        font-weight: 600;
+        margin-bottom: 16px;
+    }
+    
+    .message-list {
+        height: 260px;
+        overflow-y: auto;
+        border: 1px solid #e0e0e0;
+        padding: 16px;
+        margin-top: 10px;
+        border-radius: 10px;
+        background-color: #fdfdfd;
+        box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);
+        scroll-behavior: smooth;
+    }
+    
+    .message {
+        padding: 12px 16px;
+        margin-bottom: 12px;
+        border-radius: 10px;
+        position: relative;
+        word-break: break-word;
+        font-size: 15px;
+        transition: background-color 0.2s ease;
+    }
+    
+    .received {
+        background-color: #e3f2fd;
+        border-left: 5px solid #2196f3;
+        box-shadow: 0 1px 3px rgba(33, 150, 243, 0.2);
+    }
+    
+    .sent {
+        background-color: #e8f5e9;
+        border-right: 5px solid #4caf50;
+        text-align: right;
+        box-shadow: 0 1px 3px rgba(76, 175, 80, 0.2);
+    }
+    
+    .input-group {
+        display: flex;
+        gap: 12px;
+    }
+    
+    .input-group input {
+        flex-grow: 1;
+        padding: 12px 16px;
+        font-size: 15px;
+        border: 1px solid #ccc;
+        border-radius: 10px;
+        transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    }
+    
+    .input-group input:focus {
+        border-color: #4CAF50;
+        box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);
+        outline: none;
+    }
+    
+    button {
+        padding: 12px 20px;
+        font-size: 15px;
+        background: linear-gradient(to right, #4CAF50, #43A047);
+        color: #fff;
+        border: none;
+        border-radius: 10px;
+        cursor: pointer;
+        transition: background 0.3s ease, transform 0.2s ease;
+    }
+    
+    button:hover {
+        background: linear-gradient(to right, #43A047, #388E3C);
+        transform: translateY(-1px);
+    }
+    
+    .x-icon {
+        position: absolute;
+        top: 8px;
+        right: 12px;
+        color: #888;
+        font-size: 18px;
+        font-weight: bold;
+        cursor: pointer;
+        transition: color 0.2s ease, transform 0.2s ease;
+    }
+    
+    .x-icon:hover {
+        color: #e53935;
+        transform: scale(1.2);
+    }
+    
+    /* Scrollbar styling (optional) */
+    .message-list::-webkit-scrollbar {
+        width: 8px;
+    }
+    .message-list::-webkit-scrollbar-thumb {
+        background: #ccc;
+        border-radius: 8px;
+    }
+    .message-list::-webkit-scrollbar-thumb:hover {
+        background: #aaa;
+    }  
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>ESP8266 MQTT Communication</h1>
+    
+    <div class="card">
+      <h2>Send Command to ESP8266</h2>
+      <div class="input-group">
+        <input type="text" id="commandInput" placeholder="Type command here...">
+        <button id="sendBtn">Send</button>
+      </div>
+    </div>
+    
+    <div class="card">
+      <h2>Message History</h2>
+      <div class="message-list" id="messageList"></div>
+    </div>
+  </div>
+
+  <script>
+    // IMPORTANT: Connect to the main MQTT server where Socket.IO is running
+    const socket = io('http://localhost:3000', {
+      withCredentials: true
+    });
+    
+    // DOM elements
+    const commandInput = document.getElementById('commandInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const messageList = document.getElementById('messageList');
+    
+    // Handle sending messages
+    sendBtn.addEventListener('click', sendMessage);
+    commandInput.addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') {
+        sendMessage();
+      }
+    });
+    
+    // Socket connection status handler
+    socket.on('connect', () => {
+      addMessageToList('Connected to server!', 'received');
+      console.log('Connected to Socket.IO server');
+    });
+    
+    socket.on('connect_error', (error) => {
+      console.error('Connection error:', error);
+      addMessageToList('Connection error: ' + error.message, 'received');
+    });
+    
+    function sendMessage() {
+      const message = commandInput.value.trim();
+      if (message) {
+        // Send message to server
+        socket.emit('sendToESP', message);
+        
+        // Add to message list
+        addMessageToList('Sent: ' + message, 'sent');
+        
+        // Clear input
+        commandInput.value = '';
+      }
+    }
+    
+    // Handle receiving messages from ESP8266
+    socket.on('espMessage', (message) => {
+      addMessageToList('Received: ' + message, 'received');
+    });
+    
+    // Add message to the message list
+    function addMessageToList(text, type) {
+      const messageElement = document.createElement('div');
+      messageElement.classList.add('message', type);
+      messageElement.textContent = text;
+      
+      messageList.appendChild(messageElement);
+      messageList.scrollTop = messageList.scrollHeight;
+    }
+  </script>
+</body>
+</html>
