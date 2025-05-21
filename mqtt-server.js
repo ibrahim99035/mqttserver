@@ -8,12 +8,13 @@ const path = require('path');
 const app = express();
 const server = http.createServer(app);
 
-// Configure Socket.IO with CORS
+// Configure Socket.IO with CORS - FIXED
 const io = socketIo(server, {
   cors: {
-    origin: "https://ibrahim99035.github.io/", // Your HTML server address
+    origin: "*", // Allow all origins 
     methods: ["GET", "POST"],
-    credentials: true
+    credentials: true,
+    transports: ['websocket', 'polling'] // Explicitly define transports
   }
 });
 
@@ -52,6 +53,18 @@ mqttClient.on('message', (topic, message) => {
     console.log(`Message from ESP8266: ${messageStr}`);
     io.emit('espMessage', messageStr);
   }
+});
+
+// Enable CORS for Express routes - ADDED
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
 });
 
 // Serve static files

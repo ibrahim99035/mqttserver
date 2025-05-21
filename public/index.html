@@ -139,12 +139,31 @@
     }
     .message-list::-webkit-scrollbar-thumb:hover {
         background: #aaa;
-    }  
+    }
+    
+    /* Status indicator added */
+    .connection-status {
+        padding: 8px 16px;
+        border-radius: 8px;
+        display: inline-block;
+        margin-bottom: 16px;
+        font-weight: 500;
+    }
+    .status-connected {
+        background-color: #c8e6c9;
+        color: #2e7d32;
+    }
+    .status-disconnected {
+        background-color: #ffcdd2;
+        color: #c62828;
+    }
   </style>
 </head>
 <body>
   <div class="container">
     <h1>ESP8266 MQTT Communication</h1>
+    
+    <div id="connectionStatus" class="connection-status status-disconnected">Disconnected</div>
     
     <div class="card">
       <h2>Send Command to ESP8266</h2>
@@ -161,15 +180,19 @@
   </div>
 
   <script>
-    // IMPORTANT: Connect to the main MQTT server where Socket.IO is running
-    const socket = io('https://companysa.onrender.com', {
-      withCredentials: true
-    });
-    
     // DOM elements
     const commandInput = document.getElementById('commandInput');
     const sendBtn = document.getElementById('sendBtn');
     const messageList = document.getElementById('messageList');
+    const connectionStatus = document.getElementById('connectionStatus');
+    
+    // FIXED: Socket.IO connection - explicitly use websocket first, then polling
+    const socket = io('https://companysa.onrender.com', {
+      transports: ['websocket', 'polling'],
+      withCredentials: false, // Changed to false to avoid CORS issues
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000
+    });
     
     // Handle sending messages
     sendBtn.addEventListener('click', sendMessage);
@@ -179,28 +202,56 @@
       }
     });
     
-    // Socket connection status handler
+    // Socket connection status handlers
     socket.on('connect', () => {
-      addMessageToList('Connected to server!', 'received');
       console.log('Connected to Socket.IO server');
+      addMessageToList('Connected to server!', 'received');
+      updateConnectionStatus(true);
+    });
+    
+    socket.on('disconnect', () => {
+      console.log('Disconnected from Socket.IO server');
+      addMessageToList('Disconnected from server', 'received');
+      updateConnectionStatus(false);
     });
     
     socket.on('connect_error', (error) => {
       console.error('Connection error:', error);
       addMessageToList('Connection error: ' + error.message, 'received');
+      updateConnectionStatus(false);
+      
+      // Try to reconnect using websocket only
+      if (socket.io.opts.transports.includes('polling')) {
+        console.log('Trying websocket only...');
+        socket.io.opts.transports = ['websocket'];
+      }
     });
+    
+    function updateConnectionStatus(connected) {
+      if (connected) {
+        connectionStatus.className = 'connection-status status-connected';
+        connectionStatus.textContent = 'Connected';
+      } else {
+        connectionStatus.className = 'connection-status status-disconnected';
+        connectionStatus.textContent = 'Disconnected';
+      }
+    }
     
     function sendMessage() {
       const message = commandInput.value.trim();
       if (message) {
-        // Send message to server
-        socket.emit('sendToESP', message);
-        
-        // Add to message list
-        addMessageToList('Sent: ' + message, 'sent');
-        
-        // Clear input
-        commandInput.value = '';
+        if (socket.connected) {
+          // Send message to server
+          socket.emit('sendToESP', message);
+          
+          // Add to message list
+          addMessageToList('Sent: ' + message, 'sent');
+          
+          // Clear input
+          commandInput.value = '';
+        } else {
+          addMessageToList('Cannot send message: Not connected to server', 'received');
+        }
       }
     }
     
